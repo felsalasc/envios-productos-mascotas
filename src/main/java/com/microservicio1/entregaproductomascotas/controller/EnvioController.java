@@ -1,97 +1,75 @@
 package com.microservicio1.entregaproductomascotas.controller;
 
 import com.microservicio1.entregaproductomascotas.model.Envio;
+import com.microservicio1.entregaproductomascotas.service.EnvioService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+import java.util.List;
 
 @RestController
 @RequestMapping("/envios")
 public class EnvioController {
 
-    private List<Envio> listaEnvios = new ArrayList<>();
+    private final EnvioService envioService;
 
-    public EnvioController() {
-        listaEnvios.add(new Envio(
-                1L,
-                "Alimento para perro",
-                "Felipe Salas",
-                "mar atalantico 550",
-                "PREPARANDO",
-                "Bodega Central",
-                "2026-04-01"
-        ));
-
-        listaEnvios.add(new Envio(
-                2L,
-                "Juguete para gato",
-                "Maria perez",
-                "Calle mar 456",
-                "EN_TRANSITO",
-                "Centro de Distribución",
-                "2026-03-30"
-        ));
-
-        listaEnvios.add(new Envio(
-                3L,
-                "Correa para perro",
-                "Pedro Ortega",
-                "Pasaje luna  1",
-                "ENTREGADO",
-                "Domicilio del cliente",
-                "2026-03-28"
-        ));
+    public EnvioController(EnvioService envioService) {
+        this.envioService = envioService;
     }
 
     @GetMapping
     public List<Envio> obtenerTodos() {
-        return listaEnvios;
+        return envioService.listarTodos();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerPorId(@PathVariable Long id) {
-        for (Envio envio : listaEnvios) {
-            if (envio.getId().equals(id)) {
-                return ResponseEntity.ok(envio);
-            }
-        }
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", "No se encontró el envío con id " + id));
+        return envioService.buscarPorId(id)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No se encontró el envío con id " + id)));
     }
 
     @GetMapping("/{id}/ubicacion")
     public ResponseEntity<?> obtenerUbicacion(@PathVariable Long id) {
-        for (Envio envio : listaEnvios) {
-            if (envio.getId().equals(id)) {
-                return ResponseEntity.ok(Map.of(
+        return envioService.buscarPorId(id)
+                .<ResponseEntity<?>>map(envio -> ResponseEntity.ok(Map.of(
                         "id", envio.getId(),
                         "estado", envio.getEstado(),
                         "ubicacionActual", envio.getUbicacionActual()
-                ));
-            }
-        }
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", "No se encontró el envío con id " + id));
+                )))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No se encontró el envío con id " + id)));
     }
 
     @GetMapping("/estado/{estado}")
     public List<Envio> obtenerPorEstado(@PathVariable String estado) {
-        List<Envio> resultado = new ArrayList<>();
-
-        for (Envio envio : listaEnvios) {
-            if (envio.getEstado().equalsIgnoreCase(estado)) {
-                resultado.add(envio);
-            }
-        }
-
-        return resultado;
+        return envioService.buscarPorEstado(estado);
     }
 
-   
+    @PostMapping
+    public ResponseEntity<Envio> crear(@Valid @RequestBody Envio envio) {
+        Envio nuevo = envioService.guardar(envio);
+        return ResponseEntity.status(HttpStatus.CREATED).body(nuevo);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> actualizar(@PathVariable Long id, @Valid @RequestBody Envio envio) {
+        return envioService.actualizar(id, envio)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No se encontró el envío con id " + id)));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> eliminar(@PathVariable Long id) {
+        if (envioService.eliminar(id)) {
+            return ResponseEntity.ok(Map.of("mensaje", "Envío eliminado correctamente"));
+        }
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", "No se encontró el envío con id " + id));
+    }
 }
